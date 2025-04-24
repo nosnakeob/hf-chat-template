@@ -12,3 +12,14 @@ derive-new = "0.7"
 tokio = "1"
 hf-hub = { version = "0.4", features = ["tokio"] }
 parking_lot = "0.12"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "bufreader"
+harness = false
+
+[[bench]]
+name = "json"
+harness = false
