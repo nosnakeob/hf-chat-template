@@ -5,6 +5,7 @@ use anyhow::{Error, Result};
 use derive_new::new;
 use hf_hub::api::tokio::Api;
 use minijinja::Environment;
+use minijinja_contrib::pycompat;
 use parking_lot::RwLock;
 use serde::Serialize;
 use serde_json::Value;
@@ -13,8 +14,11 @@ use std::io::BufReader;
 use std::sync::LazyLock;
 
 /// Environment存在生命周期标注，放置全局避免在ChatContext中处理生命周期问题
-static TEMPLATE_ENV: LazyLock<RwLock<Environment>> =
-    LazyLock::new(|| RwLock::new(Environment::new()));
+static TEMPLATE_ENV: LazyLock<RwLock<Environment>> = LazyLock::new(|| {
+    let mut env = Environment::new();
+    env.set_unknown_method_callback(pycompat::unknown_method_callback);
+    RwLock::new(env)
+});
 
 pub async fn load_template(tokenizer_repo: &str) -> Result<Value> {
     let pth = Api::new()?
@@ -99,20 +103,6 @@ impl ChatContext {
             .render(&ctx)
             .map_err(Error::msg)
     }
-
-    pub async fn set_tokenizer_repo(&mut self, tokenizer_repo: &str) -> Result<()> {
-        self.tokenizer_repo = tokenizer_repo.to_string();
-
-        if TEMPLATE_ENV.read().get_template(tokenizer_repo).is_err() {
-            let template = load_template(tokenizer_repo).await?;
-            TEMPLATE_ENV.write().add_template_owned(
-                tokenizer_repo.to_string(),
-                template.as_str().unwrap().to_string(),
-            )?;
-        }
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -159,9 +149,14 @@ mod tests {
             how are you<|im_end|>\n\
             <|im_start|>assistant\n"
         );
-        template
-            .set_tokenizer_repo("deepseek-ai/DeepSeek-R1-Distill-Llama-8B")
-            .await?;
+
+        // 带思考过程
+        template = ChatContext::new("deepseek-ai/DeepSeek-R1-Distill-Llama-8B").await?;
+
+        template.push_msg("hello");
+        template.push_msg("balababa</think>hi");
+        template.push_msg("how are you");
+
         assert_eq!(
             template.render()?,
             "<｜User｜>hello<｜Assistant｜>hi<｜end▁of▁sentence｜><｜User｜>how are you<｜Assistant｜><think>\n"
