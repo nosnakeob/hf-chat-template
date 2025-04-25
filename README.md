@@ -9,5 +9,5 @@
 
 ```toml
 [dependencies]
-hf-chat-template = "0.1"
+hf-chat-template = { version = "0.3", git = "https://github.com/nosnakeob/hf-chat-template.git" }
 ```
