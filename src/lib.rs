@@ -4,9 +4,8 @@ extern crate anyhow;
 use anyhow::{Error, Result};
 use derive_new::new;
 use hf_hub::api::tokio::Api;
-use minijinja::Environment;
+use minijinja::{Environment, Template};
 use minijinja_contrib::pycompat;
-use parking_lot::RwLock;
 use serde::Serialize;
 use serde_json::Value;
 use std::fs::File;
@@ -14,10 +13,10 @@ use std::io::BufReader;
 use std::sync::LazyLock;
 
 /// Environment存在生命周期标注，放置全局避免在ChatContext中处理生命周期问题
-static TEMPLATE_ENV: LazyLock<RwLock<Environment>> = LazyLock::new(|| {
+static TEMPLATE_ENV: LazyLock<Environment> = LazyLock::new(|| {
     let mut env = Environment::new();
     env.set_unknown_method_callback(pycompat::unknown_method_callback);
-    RwLock::new(env)
+    env
 });
 
 pub async fn load_template(tokenizer_repo: &str) -> Result<Value> {
@@ -53,26 +52,21 @@ pub struct ChatContext {
     pub add_generation_prompt: bool,
 
     #[serde(skip_serializing)]
-    pub tokenizer_repo: String,
+    template: Template<'static, 'static>,
 }
 
 impl ChatContext {
     pub async fn new(tokenizer_repo: &str) -> Result<Self> {
-        let tokenizer_repo = tokenizer_repo.to_string();
-
-        if TEMPLATE_ENV.read().get_template(&tokenizer_repo).is_err() {
-            let template = load_template(&tokenizer_repo).await?;
-
-            TEMPLATE_ENV.write().add_template_owned(
-                tokenizer_repo.clone(),
-                template.as_str().unwrap().to_string(),
-            )?;
-        }
+        let template_str = load_template(&tokenizer_repo)
+            .await?
+            .as_str()
+            .unwrap()
+            .to_string();
 
         Ok(Self {
             messages: vec![],
             add_generation_prompt: true,
-            tokenizer_repo,
+            template: TEMPLATE_ENV.template_from_str(Box::leak(template_str.into_boxed_str()))?,
         })
     }
 
@@ -87,7 +81,11 @@ impl ChatContext {
                 _ => Role::User,
             },
         };
-        self.messages.push(Message::new(role, content));
+        self.messages.push(Message::new(
+            role,
+            // 带思考过程只取回答
+            content.split("</think>").last().unwrap(),
+        ));
     }
 
     pub fn render(&self) -> Result<String> {
@@ -97,11 +95,7 @@ impl ChatContext {
 
         let ctx = serde_json::to_value(self)?;
 
-        TEMPLATE_ENV
-            .read()
-            .get_template(&self.tokenizer_repo)?
-            .render(&ctx)
-            .map_err(Error::msg)
+        self.template.render(&ctx).map_err(Error::msg)
     }
 }
 

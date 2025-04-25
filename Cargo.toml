@@ -1,6 +1,6 @@
 [package]
 name = "hf-chat-template"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 
 [dependencies]
@@ -12,7 +12,6 @@ minijinja-contrib = { version = "2.9", features = ["pycompat"] }
 derive-new = "0.7"
 tokio = "1"
 hf-hub = { version = "0.4", features = ["tokio"] }
-parking_lot = "0.12"
 
 [dev-dependencies]
 criterion = "0.5"
