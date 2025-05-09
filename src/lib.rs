@@ -144,6 +144,23 @@ mod tests {
             <|im_start|>assistant\n"
         );
 
+        let mut template = ChatContext::new("Qwen/Qwen3-8B").await?;
+
+        template.push_msg("hello");
+        template.push_msg("hi");
+        template.push_msg("how are you");
+
+        assert_eq!(
+            template.render()?,
+            "<|im_start|>user\n\
+            hello<|im_end|>\n\
+            <|im_start|>assistant\n\
+            hi<|im_end|>\n\
+            <|im_start|>user\n\
+            how are you<|im_end|>\n\
+            <|im_start|>assistant\n"
+        );
+
         // 带思考过程
         template = ChatContext::new("deepseek-ai/DeepSeek-R1-Distill-Llama-8B").await?;
 
