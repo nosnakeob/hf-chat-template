@@ -50,6 +50,8 @@ pub struct Message {
 pub struct ChatContext {
     pub messages: Vec<Message>,
     pub add_generation_prompt: bool,
+    // qwen3特有
+    pub enable_thinking: bool,
 
     #[serde(skip_serializing)]
     template: Template<'static, 'static>,
@@ -66,6 +68,7 @@ impl ChatContext {
         Ok(Self {
             messages: vec![],
             add_generation_prompt: true,
+            enable_thinking: false,
             template: TEMPLATE_ENV.template_from_str(Box::leak(template_str.into_boxed_str()))?,
         })
     }
@@ -158,7 +161,8 @@ mod tests {
             hi<|im_end|>\n\
             <|im_start|>user\n\
             how are you<|im_end|>\n\
-            <|im_start|>assistant\n"
+            <|im_start|>assistant\n\
+            <think>\n\n</think>\n\n"
         );
 
         // 带思考过程
